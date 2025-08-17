@@ -78,6 +78,9 @@ class BedrockChatModel:
         json_mode = kwargs.get("json", False)
         json_model = kwargs.get("json_model", None)
         
+        # Debug: Log JSON mode parameters
+        logger.debug(f"JSON mode: {json_mode}, JSON model: {json_model}")
+        
         # Map parameters to model-specific format
         model_params = map_model_parameters(
             self.model_id,
@@ -91,11 +94,14 @@ class BedrockChatModel:
             # SHA256 hash truncated to 16 chars provides good uniqueness while keeping filenames short
             prompt_hash = hashlib.sha256(formatted_prompt.encode('utf-8')).hexdigest()[:16]
             params_hash = hashlib.sha256(json.dumps(model_params, sort_keys=True).encode('utf-8')).hexdigest()[:16]
-            cache_key = f"{self.model_id}:{prompt_hash}:{params_hash}"
+            
+            # Include JSON mode parameters in cache key to ensure proper cache isolation
+            json_mode_suffix = f":json={json_mode}:json_model={json_model.__name__ if json_model else None}"
+            cache_key = f"{self.model_id}:{prompt_hash}:{params_hash}{json_mode_suffix}"
             if self.cache:
                 cached_data = await self.cache.get(cache_key)
                 if cached_data:
-                    # Reconstruct BaseModelResponse from cached data
+                    # Reconstruct BaseModelResponse from cached data  
                     return BaseModelResponse(**cached_data)
             
             # Call Bedrock API
@@ -112,6 +118,7 @@ class BedrockChatModel:
                     parsed_json = json_lib.loads(content)
                     # Validate and parse with the provided Pydantic model
                     parsed_response = json_model(**parsed_json)
+                    logger.debug(f"Successfully parsed JSON response with {json_model.__name__}")
                 except Exception as json_error:
                     logger.error("Failed to parse JSON response: %s", json_error)
                     logger.error("Content: %s", content[:500])
