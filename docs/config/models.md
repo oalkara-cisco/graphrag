@@ -56,6 +56,76 @@ global_search:
 
 Another option would be to avoid using a language model at all for the graph extraction, instead using the `fast` [indexing method](../index/methods.md) that uses NLP for portions of the indexing phase in lieu of LLM APIs.
 
+## AWS Bedrock Support
+
+As of GraphRAG 2.5.0, we now provide built-in support for AWS Bedrock models. This includes support for various chat models (Claude, Llama, Mistral, etc.) and embedding models (Amazon Titan).
+
+### Installation
+
+To use AWS Bedrock models, you need to install GraphRAG with the bedrock extra:
+
+```bash
+pip install graphrag[bedrock]
+```
+
+### Configuration
+
+Bedrock models use AWS authentication, preferring AWS profiles over API keys. The library will use the standard AWS credential chain:
+1. AWS profile (if specified)
+2. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+3. EC2 instance profile
+4. Other AWS credential sources
+
+Example configuration:
+
+```yaml
+models:
+  # Bedrock Chat Model using Claude
+  bedrock_claude:
+    type: bedrock_chat
+    model: anthropic.claude-3-sonnet-20240229-v1:0
+    aws_region: us-east-1
+    aws_profile: default  # Optional: uses default AWS credential chain if not specified
+    max_tokens: 4096
+    temperature: 0.7
+    
+  # Bedrock Embedding Model using Titan
+  bedrock_titan_embed:
+    type: bedrock_embedding
+    model: amazon.titan-embed-text-v2:0
+    aws_region: us-east-1
+    aws_profile: default
+
+# Use in workflows
+embeddings:
+  model_id: bedrock_titan_embed
+  
+extract_graph:
+  model_id: bedrock_claude
+```
+
+### Supported Models
+
+**Chat Models:**
+- Claude (all versions): `anthropic.claude-3-*`, `anthropic.claude-instant-*`
+- Llama 2/3: `meta.llama2-*`, `meta.llama3-*`
+- Mistral/Mixtral: `mistral.*`
+- Cohere Command: `cohere.command-*`
+- Amazon Titan Text: `amazon.titan-text-*`
+- AI21 Jurassic/Jamba: `ai21.j2-*`, `ai21.jamba-*`
+
+**Embedding Models:**
+- Amazon Titan Text Embeddings: `amazon.titan-embed-text-v1`, `amazon.titan-embed-text-v2:0`
+- Cohere Embed: `cohere.embed-english-v3`, `cohere.embed-multilingual-v3`
+
+### Notes on Bedrock Usage
+
+- Bedrock models have different parameter names and response formats, which are handled automatically by the provider
+- Streaming is supported for chat models
+- Batch embedding is optimized based on model capabilities (Titan supports 25 texts per batch, Cohere supports 96)
+- Cost and performance characteristics vary significantly between models - experiment to find the right balance
+- Some models like Claude have specific formatting requirements that are handled automatically
+
 ## Using Non-OpenAI Models
 
 As noted above, our primary experience and focus has been on OpenAI models, so this is what is supported out-of-the-box. Many users have requested support for additional model types, but it's out of the scope of our research to handle the many models available today. There are two approaches you can use to connect to a non-OpenAI model:

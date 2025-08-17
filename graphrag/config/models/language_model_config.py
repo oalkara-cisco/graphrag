@@ -43,6 +43,10 @@ class LanguageModelConfig(BaseModel):
         ApiKeyMissingError
             If the API key is missing and is required.
         """
+        # Bedrock models don't use API keys
+        if self.type in (ModelType.BedrockChat, ModelType.BedrockEmbedding):
+            return
+            
         if self.auth_type == AuthType.APIKey and (
             self.api_key is None or self.api_key.strip() == ""
         ):
@@ -298,6 +302,20 @@ class LanguageModelConfig(BaseModel):
         description="The presence penalty to use for token generation.",
         default=language_model_defaults.presence_penalty,
     )
+    
+    # AWS Bedrock specific fields
+    aws_region: str | None = Field(
+        description="AWS region for Bedrock service (e.g., 'us-east-1').",
+        default=None,
+    )
+    aws_profile: str | None = Field(
+        description="AWS profile to use for authentication. If not set, will use default credential chain.",
+        default=None,
+    )
+    bedrock_model_id: str | None = Field(
+        description="Bedrock model ID (e.g., 'anthropic.claude-3-sonnet-20240229-v1:0').",
+        default=None,
+    )
 
     def _validate_azure_settings(self) -> None:
         """Validate the Azure settings.
@@ -315,6 +333,19 @@ class LanguageModelConfig(BaseModel):
         self._validate_api_version()
         self._validate_deployment_name()
 
+    def _validate_bedrock_settings(self) -> None:
+        """Validate the Bedrock settings.
+
+        Raises
+        ------
+        ValueError
+            If Bedrock model ID is missing when using Bedrock model types.
+        """
+        if self.type in (ModelType.BedrockChat, ModelType.BedrockEmbedding):
+            if not self.bedrock_model_id and not self.model:
+                msg = f"bedrock_model_id or model must be specified for model type {self.type}"
+                raise ValueError(msg)
+
     @model_validator(mode="after")
     def _validate_model(self):
         self._validate_type()
@@ -324,5 +355,6 @@ class LanguageModelConfig(BaseModel):
         self._validate_requests_per_minute()
         self._validate_max_retries()
         self._validate_azure_settings()
+        self._validate_bedrock_settings()
         self._validate_encoding_model()
         return self

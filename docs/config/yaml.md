@@ -24,6 +24,8 @@ llm:
 This is a dict of model configurations. The dict key is used to reference this configuration elsewhere when a model instance is desired. In this way, you can specify as many different models as you need, and reference them differentially in the workflow steps.
 
 For example:
+
+OpenAI models:
 ```yml
 models:
   default_chat_model:
@@ -37,15 +39,36 @@ models:
     model: text-embedding-ada-002
 ```
 
+AWS Bedrock models:
+```yml
+models:
+  default_chat_model:
+    type: bedrock_chat
+    model: anthropic.claude-3-sonnet-20240229-v1:0
+    aws_region: us-east-1
+    aws_profile: default  # Optional, uses default credential chain if not set
+    max_tokens: 4096
+    temperature: 0.7
+    model_supports_json: true
+  default_embedding_model:
+    type: bedrock_embedding
+    model: amazon.titan-embed-text-v2:0
+    aws_region: us-east-1
+    aws_profile: default
+```
+
 #### Fields
 
-- `api_key` **str** - The OpenAI API key to use.
-- `auth_type` **api_key|azure_managed_identity** - Indicate how you want to authenticate requests.
-- `type` **openai_chat|azure_openai_chat|openai_embedding|azure_openai_embedding|mock_chat|mock_embeddings** - The type of LLM to use.
+- `api_key` **str** - The OpenAI API key to use. Not required for Bedrock models.
+- `auth_type` **api_key|azure_managed_identity** - Indicate how you want to authenticate requests. Not used for Bedrock models.
+- `type` **openai_chat|azure_openai_chat|openai_embedding|azure_openai_embedding|bedrock_chat|bedrock_embedding|mock_chat|mock_embeddings** - The type of LLM to use.
 - `model` **str** - The model name.
 - `encoding_model` **str** - The text encoding model to use. Default is to use the encoding model aligned with the language model (i.e., it is retrieved from tiktoken if unset).
 - `api_base` **str** - The API base url to use.
 - `api_version` **str** - The API version.
+- `aws_region` **str** - AWS region for Bedrock service (e.g., 'us-east-1'). Only for Bedrock models.
+- `aws_profile` **str** - AWS profile to use for authentication. If not set, will use default credential chain. Only for Bedrock models.
+- `bedrock_model_id` **str** - Bedrock model ID (e.g., 'anthropic.claude-3-sonnet-20240229-v1:0'). Only for Bedrock models.
 - `deployment_name` **str** - The deployment name to use (Azure).
 - `organization` **str** - The client organization.
 - `proxy` **str** - The proxy URL to use.

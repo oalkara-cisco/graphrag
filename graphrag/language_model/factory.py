@@ -8,6 +8,10 @@ from typing import Any, ClassVar
 
 from graphrag.config.enums import ModelType
 from graphrag.language_model.protocol import ChatModel, EmbeddingModel
+from graphrag.language_model.providers.bedrock.models import (
+    BedrockChatModel,
+    BedrockEmbeddingModel,
+)
 from graphrag.language_model.providers.fnllm.models import (
     AzureOpenAIChatFNLLM,
     AzureOpenAIEmbeddingFNLLM,
@@ -105,10 +109,16 @@ ModelFactory.register_chat(
 ModelFactory.register_chat(
     ModelType.OpenAIChat, lambda **kwargs: OpenAIChatFNLLM(**kwargs)
 )
+ModelFactory.register_chat(
+    ModelType.BedrockChat, lambda **kwargs: BedrockChatModel(**kwargs)
+)
 
 ModelFactory.register_embedding(
     ModelType.AzureOpenAIEmbedding, lambda **kwargs: AzureOpenAIEmbeddingFNLLM(**kwargs)
 )
 ModelFactory.register_embedding(
     ModelType.OpenAIEmbedding, lambda **kwargs: OpenAIEmbeddingFNLLM(**kwargs)
+)
+ModelFactory.register_embedding(
+    ModelType.BedrockEmbedding, lambda **kwargs: BedrockEmbeddingModel(**kwargs)
 )
