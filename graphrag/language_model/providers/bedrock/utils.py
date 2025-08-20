@@ -11,6 +11,8 @@ import logging
 import os
 import threading
 from typing import TYPE_CHECKING, Any, TypeVar
+from botocore.config import Config
+
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -48,20 +50,38 @@ def create_bedrock_client(config: LanguageModelConfig) -> Any:
     else:
         logger.info("No AWS profile specified, using default credential chain (env vars, instance profile, etc.)")
         session = boto3.Session()
+
+    # Configure timeout settings for Bedrock runtime client
+    # Extended timeout for long-running AI model inference calls (entity summarization can take 15+ minutes)
+    bedrock_config = Config(
+        read_timeout=1000,  # 16.7 minutes - handles long entity summarization tasks
+        connect_timeout=60, # 1 minute for initial connection
+        retries={'max_attempts': 0}  # Disable boto3 retries (we handle retries in our enhanced models)
+    )
+    
+    # Separate config for STS (identity verification) - fast operations
+    sts_config = Config(
+        read_timeout=30,    # 30 seconds is plenty for identity verification
+        connect_timeout=10  # 10 seconds for STS connection
+    )
     
     try:
-        # Create Bedrock runtime client
-        client = session.client(
-            "bedrock-runtime",
-            region_name=aws_region,
-        )
-        
-        # Test credentials by getting caller identity (optional verification)
-        sts_client = session.client("sts", region_name=aws_region)
+        # Test credentials first with lightweight STS call (separate client for different timeout needs)
+        sts_client = session.client("sts", region_name=aws_region, config=sts_config)
         caller_identity = sts_client.get_caller_identity()
         logger.info("Successfully authenticated with AWS. Account: %s, ARN: %s", 
                    caller_identity.get("Account", "unknown"),
                    caller_identity.get("Arn", "unknown"))
+        
+        # Create Bedrock runtime client with extended timeout for long AI inference calls
+        client = session.client(
+            "bedrock-runtime",
+            region_name=aws_region,
+            config=bedrock_config
+        )
+        
+        logger.info("Bedrock client created with read_timeout=%ds for handling long inference calls", 
+                   bedrock_config.read_timeout)
         
     except Exception as e:
         error_msg = f"Failed to create Bedrock client or authenticate with AWS: {e}"
