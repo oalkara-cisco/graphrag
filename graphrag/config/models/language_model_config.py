@@ -316,6 +316,12 @@ class LanguageModelConfig(BaseModel):
         description="Bedrock model ID (e.g., 'anthropic.claude-3-sonnet-20240229-v1:0').",
         default=None,
     )
+    
+    # Cache strategy configuration
+    cache_strategy: str = Field(
+        description="Cache strategy: 'shared' (cross-model), 'family' (model family), or 'model_specific' (default).",
+        default=language_model_defaults.cache_strategy,
+    )
 
     def _validate_azure_settings(self) -> None:
         """Validate the Azure settings.

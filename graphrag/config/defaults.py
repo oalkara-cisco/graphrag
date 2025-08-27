@@ -299,6 +299,7 @@ class LanguageModelDefaults:
     concurrent_requests: int = 25
     responses: None = None
     async_mode: AsyncType = AsyncType.Threaded
+    cache_strategy: str = "model_specific"
 
 
 @dataclass
