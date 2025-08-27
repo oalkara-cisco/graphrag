@@ -51,6 +51,14 @@ where 1, 5, 7, 23, 2, 34, 46, and 64 represent the id (not the index) of the rel
 
 Do not include information where the supporting evidence for it is not provided.
 
+# Source Citation Rules
+
+When text units contain source URLs or citations, include them in your references for enhanced traceability:
+
+"This statement is supported by documentation [Data: Text Units (123, 456); Source: [Page Title](https://example.com/page)]."
+
+Include source URLs when available to provide direct links to the original documentation.
+
 Limit the total report length to {max_report_length} words.
 
 # Example Input
@@ -147,6 +155,14 @@ For example:
 where 1, 5, 7, 23, 2, 34, 46, and 64 represent the id (not the index) of the relevant data record.
 
 Do not include information where the supporting evidence for it is not provided.
+
+# Source Citation Rules
+
+When text units contain source URLs or citations, include them in your references for enhanced traceability:
+
+"This statement is supported by documentation [Data: Text Units (123, 456); Source: [Page Title](https://example.com/page)]."
+
+Include source URLs when available to provide direct links to the original documentation.
 
 Limit the total report length to {max_report_length} words.
 

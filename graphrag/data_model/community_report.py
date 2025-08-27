@@ -37,6 +37,9 @@ class CommunityReport(Named):
     period: str | None = None
     """The period of the report (optional)."""
 
+    sources: list[str] | None = None
+    """List of source URLs referenced in the report (optional)."""
+
     @classmethod
     def from_dict(
         cls,
@@ -51,6 +54,7 @@ class CommunityReport(Named):
         attributes_key: str = "attributes",
         size_key: str = "size",
         period_key: str = "period",
+        sources_key: str = "sources",
     ) -> "CommunityReport":
         """Create a new community report from the dict data."""
         return CommunityReport(
@@ -64,4 +68,5 @@ class CommunityReport(Named):
             attributes=d.get(attributes_key),
             size=d.get(size_key),
             period=d.get(period_key),
+            sources=d.get(sources_key),
         )

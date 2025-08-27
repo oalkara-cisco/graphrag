@@ -4,8 +4,10 @@
 """A module containing 'CommunityReportsResult' and 'CommunityReportsExtractor' models."""
 
 import logging
+import re
 import traceback
 from dataclasses import dataclass
+from typing import List, Set
 
 from pydantic import BaseModel, Field
 
@@ -18,6 +20,43 @@ logger = logging.getLogger(__name__)
 # these tokens are used in the prompt
 INPUT_TEXT_KEY = "input_text"
 MAX_LENGTH_KEY = "max_report_length"
+
+
+def extract_source_urls_from_context(context_text: str) -> List[str]:
+    """
+    Extract source URLs from community context text.
+    
+    Args:
+        context_text: The community context containing text units and metadata
+        
+    Returns:
+        List of unique source URLs found in the context
+    """
+    source_urls: Set[str] = set()
+    
+    # Look for source URLs in the context text
+    # Pattern 1: Direct URLs in source_citation or source_metadata
+    url_patterns = [
+        r'https?://[^\s\)]+',  # Standard URL pattern
+        r'source_url[\'"]?\s*:\s*[\'"]?([^\'"\s,}]+)',  # source_url: "url"
+        r'\[([^\]]+)\]\(([^)]+)\)'  # Markdown links [title](url)
+    ]
+    
+    for pattern in url_patterns:
+        matches = re.findall(pattern, context_text, re.IGNORECASE)
+        for match in matches:
+            if isinstance(match, tuple):
+                # For patterns that capture groups (like markdown links)
+                url = match[-1] if len(match) > 1 else match[0]
+            else:
+                url = match
+            
+            # Clean and validate URL
+            url = url.strip().rstrip('.,;')
+            if url.startswith(('http://', 'https://')) and len(url) > 10:
+                source_urls.add(url)
+    
+    return sorted(list(source_urls))
 
 
 class FindingModel(BaseModel):
@@ -37,6 +76,10 @@ class CommunityReportResponse(BaseModel):
     )
     rating: float = Field(description="The rating of the report.")
     rating_explanation: str = Field(description="An explanation of the rating.")
+    sources: list[str] = Field(
+        default_factory=list, 
+        description="List of source URLs referenced in the report."
+    )
 
 
 @dataclass
@@ -73,6 +116,10 @@ class CommunityReportsExtractor:
         """Call method definition."""
         output = None
         try:
+            # Extract source URLs from the input context
+            source_urls = extract_source_urls_from_context(input_text)
+            logger.debug(f"Extracted {len(source_urls)} source URLs from community context")
+            
             prompt = self._extraction_prompt.format(**{
                 INPUT_TEXT_KEY: input_text,
                 MAX_LENGTH_KEY: str(self._max_report_length),
@@ -90,6 +137,14 @@ class CommunityReportsExtractor:
             if output and not isinstance(output, CommunityReportResponse):
                 logger.warning(f"Invalid response type: {type(output)}, expected CommunityReportResponse")
                 output = None
+            elif output:
+                # Add extracted source URLs to the report
+                if not hasattr(output, 'sources') or output.sources is None:
+                    output.sources = []
+                output.sources.extend(source_urls)
+                # Remove duplicates while preserving order
+                output.sources = list(dict.fromkeys(output.sources))
+                logger.debug(f"Added {len(source_urls)} source URLs to community report")
                 
         except Exception as e:
             logger.exception("error generating community report")
@@ -130,7 +185,19 @@ class CommunityReportsExtractor:
             else:
                 report_sections = "## Findings\n\nNo findings available."
             
-            return f"# {title}\n\n{summary}\n\n{report_sections}"
+            # Add sources section if available
+            sources_section = ""
+            if hasattr(report, 'sources') and report.sources:
+                try:
+                    sources_list = []
+                    for i, source_url in enumerate(report.sources, 1):
+                        sources_list.append(f"{i}. {source_url}")
+                    sources_section = f"\n\n## Sources\n\n" + "\n".join(sources_list)
+                except (AttributeError, TypeError) as e:
+                    logger.warning(f"Error processing sources: {e}")
+                    sources_section = "\n\n## Sources\n\nError processing source data."
+            
+            return f"# {title}\n\n{summary}\n\n{report_sections}{sources_section}"
             
         except Exception as e:
             logger.error(f"Error generating text output from community report: {e}")

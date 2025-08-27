@@ -58,6 +58,7 @@ DOCUMENT_IDS = "document_ids"
 
 PERIOD = "period"
 SIZE = "size"
+SOURCES = "sources"
 
 # text units
 ENTITY_DEGREE = "entity_degree"
@@ -124,6 +125,7 @@ COMMUNITY_REPORTS_FINAL_COLUMNS = [
     FULL_CONTENT_JSON,
     PERIOD,
     SIZE,
+    SOURCES,
 ]
 
 COVARIATES_FINAL_COLUMNS = [
