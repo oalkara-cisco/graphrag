@@ -323,7 +323,7 @@ class EnhancedBedrockChatModel:
             
             # Include JSON mode parameters in cache key
             json_mode_suffix = f":json={json_mode}:json_model={json_model.__name__ if json_model else None}"
-            cache_key = f"{self.model_id}:{prompt_hash}:{params_hash}{json_mode_suffix}"
+            cache_key = self._build_cache_key(prompt_hash, params_hash, json_mode_suffix)
             
             if self.cache:
                 try:
@@ -426,6 +426,58 @@ class EnhancedBedrockChatModel:
         
         conversation += f"assistant: {prompt}"
         return conversation
+
+    def _get_model_family(self, model_id: str) -> str:
+        """Get model family for cache grouping."""
+        if "claude" in model_id.lower():
+            return "claude"
+        elif "llama" in model_id.lower():
+            return "llama"
+        elif "mistral" in model_id.lower():
+            return "mistral"
+        elif "titan" in model_id.lower():
+            return "titan"
+        elif "cohere" in model_id.lower():
+            return "cohere"
+        elif "ai21" in model_id.lower():
+            return "ai21"
+        else:
+            return "unknown"
+
+    def _build_cache_key(self, prompt_hash: str, params_hash: str, json_mode_suffix: str) -> str:
+        """
+        Build cache key based on configuration strategy.
+        
+        Supports multiple cache strategies:
+        - 'shared': Share cache across all models (maximum cache hits)
+        - 'family': Share cache within model families (e.g., all Claude models)
+        - 'model_specific': Separate cache per model (default, most conservative)
+        """
+        # Check configuration for cache strategy
+        cache_strategy = getattr(self.config, 'cache_strategy', 'model_specific')
+        enable_cross_model_cache = getattr(self.config, 'enable_cross_model_cache', False)
+        
+        # For backward compatibility, check enable_cross_model_cache flag
+        if enable_cross_model_cache:
+            cache_strategy = 'shared'
+        
+        if cache_strategy == 'shared':
+            # Share cache across all models - maximum cache reuse
+            cache_key = f"{prompt_hash}:{params_hash}{json_mode_suffix}"
+            logger.debug(f"Using shared cache key (cross-model): {cache_key[:50]}...")
+            
+        elif cache_strategy == 'family':
+            # Share cache within model families (e.g., claude-3-sonnet, claude-3-haiku)
+            model_family = self._get_model_family(self.model_id)
+            cache_key = f"{model_family}:{prompt_hash}:{params_hash}{json_mode_suffix}"
+            logger.debug(f"Using family cache key ({model_family}): {cache_key[:50]}...")
+            
+        else:  # 'model_specific' (default)
+            # Separate cache per model - most conservative
+            cache_key = f"{self.model_id}:{prompt_hash}:{params_hash}{json_mode_suffix}"
+            logger.debug(f"Using model-specific cache key: {cache_key[:50]}...")
+        
+        return cache_key
 
     def _robust_json_parse(self, content: str, json_model: type) -> Any:
         """
@@ -747,6 +799,46 @@ class EnhancedBedrockEmbeddingModel:
             return 96
         return 1
 
+    def _build_embedding_cache_key(self, text_hash: str) -> str:
+        """
+        Build embedding cache key based on configuration strategy.
+        
+        Supports the same cache strategies as chat models:
+        - 'shared': Share cache across all embedding models
+        - 'family': Share cache within embedding model families  
+        - 'model_specific': Separate cache per model (default)
+        """
+        # Check configuration for cache strategy
+        cache_strategy = getattr(self.config, 'cache_strategy', 'model_specific')
+        enable_cross_model_cache = getattr(self.config, 'enable_cross_model_cache', False)
+        
+        # For backward compatibility
+        if enable_cross_model_cache:
+            cache_strategy = 'shared'
+        
+        if cache_strategy == 'shared':
+            # Share embedding cache across all models
+            cache_key = f"embed:{text_hash}"
+            logger.debug(f"Using shared embedding cache key: {cache_key}")
+            
+        elif cache_strategy == 'family':
+            # Share cache within embedding model families (e.g., all Titan embeddings)
+            if self.model_id.startswith("amazon.titan"):
+                model_family = "titan-embed"
+            elif self.model_id.startswith("cohere"):
+                model_family = "cohere-embed"
+            else:
+                model_family = "unknown-embed"
+            cache_key = f"{model_family}:embed:{text_hash}"
+            logger.debug(f"Using family embedding cache key ({model_family}): {cache_key}")
+            
+        else:  # 'model_specific' (default)
+            # Separate cache per embedding model
+            cache_key = f"{self.model_id}:embed:{text_hash}"
+            logger.debug(f"Using model-specific embedding cache key: {cache_key}")
+        
+        return cache_key
+
     async def _embed_batch_async(
         self, texts: list[str], **kwargs: Any
     ) -> list[list[float]]:
@@ -760,7 +852,7 @@ class EnhancedBedrockEmbeddingModel:
         
         for text in texts:
             text_hash = hashlib.sha256(text.encode('utf-8')).hexdigest()[:16]
-            cache_key = f"{self.model_id}:embed:{text_hash}"
+            cache_key = self._build_embedding_cache_key(text_hash)
             
             if self.cache:
                 try:

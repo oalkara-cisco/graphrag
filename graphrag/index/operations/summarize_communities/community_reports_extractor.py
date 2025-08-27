@@ -85,9 +85,16 @@ class CommunityReportsExtractor:
             )
 
             output = response.parsed_response
+            
+            # Validate the parsed response structure
+            if output and not isinstance(output, CommunityReportResponse):
+                logger.warning(f"Invalid response type: {type(output)}, expected CommunityReportResponse")
+                output = None
+                
         except Exception as e:
             logger.exception("error generating community report")
             self._on_error(e, traceback.format_exc(), None)
+            output = None
 
         text_output = self._get_text_output(output) if output else ""
         return CommunityReportsResult(
@@ -96,7 +103,35 @@ class CommunityReportsExtractor:
         )
 
     def _get_text_output(self, report: CommunityReportResponse) -> str:
-        report_sections = "\n\n".join(
-            f"## {f.summary}\n\n{f.explanation}" for f in report.findings
-        )
-        return f"# {report.title}\n\n{report.summary}\n\n{report_sections}"
+        """Generate text output from community report with robust error handling."""
+        try:
+            # Check if report is valid and has required attributes
+            if not report:
+                return "# Community Report\n\nNo report data available."
+            
+            # Safely get title and summary with defaults
+            title = getattr(report, 'title', 'Community Report')
+            summary = getattr(report, 'summary', 'No summary available.')
+            
+            # Safely handle findings with proper error checking
+            report_sections = ""
+            if hasattr(report, 'findings') and report.findings:
+                try:
+                    findings_list = []
+                    for f in report.findings:
+                        if hasattr(f, 'summary') and hasattr(f, 'explanation'):
+                            findings_list.append(f"## {f.summary}\n\n{f.explanation}")
+                        else:
+                            logger.warning(f"Finding missing summary or explanation: {f}")
+                    report_sections = "\n\n".join(findings_list)
+                except (AttributeError, TypeError) as e:
+                    logger.warning(f"Error processing findings: {e}")
+                    report_sections = "## Findings\n\nError processing findings data."
+            else:
+                report_sections = "## Findings\n\nNo findings available."
+            
+            return f"# {title}\n\n{summary}\n\n{report_sections}"
+            
+        except Exception as e:
+            logger.error(f"Error generating text output from community report: {e}")
+            return "# Community Report\n\nError processing community report data."
