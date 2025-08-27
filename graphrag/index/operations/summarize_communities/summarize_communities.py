@@ -89,7 +89,17 @@ async def summarize_communities(
         )
         reports.extend([lr for lr in local_reports if lr is not None])
 
-    return pd.DataFrame(reports)
+    # Create DataFrame and ensure it has the expected structure
+    df = pd.DataFrame(reports)
+    
+    # If no reports were generated, create an empty DataFrame with the expected columns
+    if df.empty:
+        df = pd.DataFrame(columns=[
+            'community', 'title', 'summary', 'full_content', 'full_content_json',
+            'rank', 'level', 'rating_explanation', 'findings', 'sources'
+        ])
+    
+    return df
 
 
 async def _generate_report(

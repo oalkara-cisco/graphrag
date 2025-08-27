@@ -15,6 +15,27 @@ def finalize_community_reports(
     communities: pd.DataFrame,
 ) -> pd.DataFrame:
     """All the steps to transform final community reports."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Debug: Log DataFrame info
+    logger.debug(f"Reports DataFrame shape: {reports.shape}")
+    logger.debug(f"Reports DataFrame columns: {list(reports.columns)}")
+    logger.debug(f"Communities DataFrame columns: {list(communities.columns)}")
+    
+    # Check if reports DataFrame is empty or missing community column
+    if reports.empty:
+        logger.warning("Reports DataFrame is empty, returning empty DataFrame")
+        return pd.DataFrame(columns=[
+            'id', 'human_readable_id', 'community', 'level', 'parent', 'children',
+            'title', 'summary', 'full_content', 'rank', 'rating_explanation',
+            'findings', 'full_content_json', 'period', 'size', 'sources'
+        ])
+    
+    if 'community' not in reports.columns:
+        logger.error(f"Missing 'community' column in reports. Available columns: {list(reports.columns)}")
+        raise KeyError("Reports DataFrame is missing the 'community' column")
+    
     # Merge with communities to add shared fields
     community_reports = reports.merge(
         communities.loc[:, ["community", "parent", "children", "size", "period"]],

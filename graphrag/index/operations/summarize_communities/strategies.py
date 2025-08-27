@@ -70,7 +70,7 @@ async def _run_extractor(
             logger.warning("No report found for community: %s", community)
             return None
 
-        return CommunityReport(
+        community_report = CommunityReport(
             community=community,
             full_content=results.output,
             level=level,
@@ -85,6 +85,8 @@ async def _run_extractor(
             full_content_json=report.model_dump_json(indent=4),
             sources=report.sources or [],
         )
+        logger.debug(f"Created CommunityReport for community {community} with keys: {list(community_report.keys())}")
+        return community_report
     except Exception:
         logger.exception("Error processing community: %s", community)
         return None
