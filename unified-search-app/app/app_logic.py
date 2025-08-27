@@ -19,6 +19,19 @@ from ui.search import display_search_result
 
 import graphrag.api as api
 
+# Import Bedrock support
+try:
+    from bedrock_config_extension import is_bedrock_config, get_config_info
+    from bedrock_model_factory import (
+        initialize_bedrock_for_search_app, 
+        get_bedrock_search_engines,
+        bedrock_manager
+    )
+    BEDROCK_SUPPORT_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Bedrock support not available: {e}")
+    BEDROCK_SUPPORT_AVAILABLE = False
+
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -28,13 +41,26 @@ logger = logging.getLogger(__name__)
 
 
 def initialize() -> SessionVariables:
-    """Initialize app logic."""
+    """Initialize app logic with Bedrock support."""
     if "session_variables" not in st.session_state:
         st.set_page_config(
             layout="wide",
             initial_sidebar_state="collapsed",
             page_title="GraphRAG",
         )
+        
+        # Initialize Bedrock support if available
+        if BEDROCK_SUPPORT_AVAILABLE:
+            try:
+                logger.info("🚀 Initializing Bedrock support for GraphRAG...")
+                bedrock_initialized = initialize_bedrock_for_search_app()
+                if bedrock_initialized:
+                    logger.info("✅ Bedrock support initialized successfully")
+                else:
+                    logger.warning("⚠️ Bedrock support initialization had issues")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize Bedrock support: {e}")
+        
         sv = SessionVariables()
         datasets = load_dataset_listing()
         sv.datasets.value = datasets
@@ -49,7 +75,7 @@ def initialize() -> SessionVariables:
 
 
 def load_dataset(dataset: str, sv: SessionVariables):
-    """Load dataset from the dropdown."""
+    """Load dataset from the dropdown with Bedrock support."""
     sv.dataset.value = dataset
     sv.dataset_config.value = next(
         (d for d in sv.datasets.value if d.key == dataset), None
@@ -57,6 +83,36 @@ def load_dataset(dataset: str, sv: SessionVariables):
     if sv.dataset_config.value is not None:
         sv.datasource.value = create_datasource(f"{sv.dataset_config.value.path}")  # type: ignore
         sv.graphrag_config.value = sv.datasource.value.read_settings("settings.yaml")
+        
+        # Check if this is a Bedrock configuration and handle accordingly
+        if sv.graphrag_config.value and BEDROCK_SUPPORT_AVAILABLE:
+            if is_bedrock_config(sv.graphrag_config.value):
+                logger.info("🔥 Detected Bedrock configuration!")
+                
+                # Get configuration details
+                config_info = get_config_info(sv.graphrag_config.value)
+                logger.info(f"📋 Configuration Details:")
+                logger.info(f"   - Chat Model: {config_info['chat_model_type']} ({config_info['chat_model_name']})")
+                logger.info(f"   - Embedding Model: {config_info['embedding_model_type']} ({config_info['embedding_model_name']})")
+                
+                # Check search capabilities
+                search_info = get_bedrock_search_engines(sv.graphrag_config.value)
+                if search_info:
+                    logger.info(f"🔍 Available Search Types: {', '.join(search_info['available_searches'])}")
+                    if search_info['recommendations']:
+                        for rec in search_info['recommendations']:
+                            logger.warning(f"💡 Recommendation: {rec}")
+                
+                # Prepare Bedrock models if possible
+                try:
+                    bedrock_manager.create_models_for_config(sv.graphrag_config.value)
+                    logger.info("✅ Bedrock models prepared successfully")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not prepare Bedrock models: {e}")
+                    logger.warning("Search functionality may be limited")
+            else:
+                logger.info("📊 Standard GraphRAG configuration detected")
+        
         load_knowledge_model(sv)
 
 
