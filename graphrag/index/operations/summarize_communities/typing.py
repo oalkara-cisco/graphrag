@@ -38,6 +38,7 @@ class CommunityReport(TypedDict):
     level: int
     rating_explanation: str
     findings: list[Finding]
+    sources: list[str]
 
 
 CommunityReportsStrategy = Callable[

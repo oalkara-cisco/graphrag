@@ -83,6 +83,7 @@ async def _run_extractor(
                 for f in report.findings
             ],
             full_content_json=report.model_dump_json(indent=4),
+            sources=report.sources or [],
         )
     except Exception:
         logger.exception("Error processing community: %s", community)
