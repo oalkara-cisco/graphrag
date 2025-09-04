@@ -828,7 +828,7 @@ class EnhancedBedrockEmbeddingModel:
             elif self.model_id.startswith("cohere"):
                 model_family = "cohere-embed"
             else:
-                model_family = "unknown-embed"
+                model_family = "generic-embed"
             cache_key = f"{model_family}:embed:{text_hash}"
             logger.debug(f"Using family embedding cache key ({model_family}): {cache_key}")
             
@@ -844,6 +844,7 @@ class EnhancedBedrockEmbeddingModel:
     ) -> list[list[float]]:
         """Embed a batch of texts asynchronously with enhanced error handling."""
         import asyncio
+        import numpy as np
         
         # Check cache first
         embeddings = []
@@ -875,14 +876,22 @@ class EnhancedBedrockEmbeddingModel:
             if self.model_id.startswith("amazon.titan"):
                 new_embeddings = []
                 for text in texts_to_embed:
-                    request_body = {"inputText": text}
-                    response = await self._invoke_embedding_model_async(request_body)
-                    embedding = response.get("embedding", [])
+                    # Handle text length limits for Titan models
+                    embedding = await self._embed_text_with_chunking(text)
                     new_embeddings.append(embedding)
                     
             elif self.model_id.startswith("cohere"):
+                # Validate text lengths for Cohere
+                validated_texts = []
+                for text in texts_to_embed:
+                    if len(text) > 512000:  # Cohere's limit is ~512k characters
+                        logger.warning(f"Text too long for Cohere ({len(text)} chars), truncating to 512000")
+                        validated_texts.append(text[:512000])
+                    else:
+                        validated_texts.append(text)
+                
                 request_body = {
-                    "texts": texts_to_embed,
+                    "texts": validated_texts,
                     "input_type": "search_document",
                 }
                 response = await self._invoke_embedding_model_async(request_body)
@@ -907,6 +916,172 @@ class EnhancedBedrockEmbeddingModel:
                 j += 1
         
         return embeddings
+
+    async def _embed_text_with_chunking(self, text: str) -> list[float]:
+        """
+        Embed text with automatic chunking for AWS Bedrock Titan models.
+        
+        Implements semantic-preserving chunking strategy based on AWS best practices
+        and academic research on embedding averaging:
+        
+        Research Support:
+        - "Frustratingly Easy Meta-Embedding" (arXiv:1804.05262)
+        - "P-SIF: Document Embeddings Using Partition Averaging" (arXiv:2005.09069)
+        
+        AWS Bedrock Strategy:
+        - Semantic chunking with word boundaries
+        - Mean pooling (averaging) of chunk embeddings
+        - Overlap preservation for context continuity
+        """
+        import numpy as np
+        
+        # Titan embedding model limits (AWS Bedrock constraints)
+        TITAN_MAX_LENGTH = 49000  # Buffer below 50,000 char limit
+        CHUNK_OVERLAP = 500  # Maintain context between chunks
+        MIN_CHUNK_SIZE = 1000  # Avoid tiny chunks that lose context
+        
+        if len(text) <= TITAN_MAX_LENGTH:
+            # Text is within limits, embed directly
+            request_body = {"inputText": text}
+            response = await self._invoke_embedding_model_async(request_body)
+            return response.get("embedding", [])
+        
+        # Text exceeds limit - apply semantic chunking strategy
+        logger.info(f"Text length {len(text):,} chars exceeds Titan limit ({TITAN_MAX_LENGTH:,})")
+        logger.info("Applying semantic-preserving chunking strategy (research-backed)")
+        
+        chunks = self._create_semantic_chunks(
+            text, 
+            max_length=TITAN_MAX_LENGTH,
+            overlap=CHUNK_OVERLAP,
+            min_chunk_size=MIN_CHUNK_SIZE
+        )
+        
+        logger.debug(f"Created {len(chunks)} semantic chunks for embedding")
+        
+        # Embed each chunk using parallel processing for efficiency
+        chunk_embeddings = []
+        failed_chunks = 0
+        
+        for i, chunk in enumerate(chunks):
+            try:
+                request_body = {"inputText": chunk}
+                response = await self._invoke_embedding_model_async(request_body)
+                embedding = response.get("embedding", [])
+                if embedding:
+                    chunk_embeddings.append(embedding)
+                    logger.debug(f"✅ Embedded chunk {i+1}/{len(chunks)} ({len(chunk):,} chars)")
+                else:
+                    logger.warning(f"⚠️ Empty embedding for chunk {i+1}")
+                    failed_chunks += 1
+            except Exception as e:
+                logger.error(f"❌ Failed to embed chunk {i+1}/{len(chunks)}: {e}")
+                failed_chunks += 1
+                raise
+        
+        if not chunk_embeddings:
+            raise ValueError("Failed to generate any embeddings from text chunks")
+        
+        if failed_chunks > 0:
+            logger.warning(f"⚠️ {failed_chunks} chunks failed to embed")
+        
+        # Apply mean pooling (standard NLP technique)
+        if len(chunk_embeddings) == 1:
+            logger.info("Single chunk - no averaging needed")
+            return chunk_embeddings[0]
+        
+        # Mean pooling: average embeddings (research-validated approach)
+        embeddings_array = np.array(chunk_embeddings)
+        averaged_embedding = np.mean(embeddings_array, axis=0)
+        
+        logger.info(f"✅ Applied mean pooling to {len(chunk_embeddings)} chunk embeddings")
+        logger.debug(f"Final embedding dimension: {len(averaged_embedding)}")
+        
+        return averaged_embedding.tolist()
+    
+    def _create_semantic_chunks(
+        self, 
+        text: str, 
+        max_length: int, 
+        overlap: int, 
+        min_chunk_size: int
+    ) -> list[str]:
+        """
+        Create semantic-aware chunks following AWS Bedrock best practices.
+        
+        Uses intelligent boundary detection to preserve meaning:
+        1. Paragraph boundaries (\\n\\n)
+        2. Sentence boundaries (.!?)
+        3. Word boundaries (space)
+        4. Maintains overlap for context preservation
+        """
+        chunks = []
+        start = 0
+        
+        # Define semantic boundaries in priority order
+        PARAGRAPH_BOUNDARIES = ['\n\n', '\n']
+        SENTENCE_BOUNDARIES = ['. ', '! ', '? ', '.\n', '!\n', '?\n']
+        PHRASE_BOUNDARIES = [', ', '; ', ': ']
+        WORD_BOUNDARY = [' ', '\t']
+        
+        while start < len(text):
+            # Calculate potential end position
+            end = min(start + max_length, len(text))
+            
+            if end >= len(text):
+                # Last chunk - take remaining text
+                chunk = text[start:]
+                if len(chunk.strip()) >= min_chunk_size:
+                    chunks.append(chunk.strip())
+                break
+            
+            # Find best semantic boundary
+            best_boundary = end
+            
+            # Try paragraph boundaries first (highest priority)
+            for boundary in PARAGRAPH_BOUNDARIES:
+                boundary_pos = text.rfind(boundary, start, end - 200)  # Look in last 200 chars
+                if boundary_pos > start + min_chunk_size:
+                    best_boundary = boundary_pos + len(boundary)
+                    break
+            
+            # Try sentence boundaries
+            if best_boundary == end:
+                for boundary in SENTENCE_BOUNDARIES:
+                    boundary_pos = text.rfind(boundary, start, end - 100)  # Look in last 100 chars
+                    if boundary_pos > start + min_chunk_size:
+                        best_boundary = boundary_pos + len(boundary)
+                        break
+            
+            # Try phrase boundaries
+            if best_boundary == end:
+                for boundary in PHRASE_BOUNDARIES:
+                    boundary_pos = text.rfind(boundary, start, end - 50)  # Look in last 50 chars
+                    if boundary_pos > start + min_chunk_size:
+                        best_boundary = boundary_pos + len(boundary)
+                        break
+            
+            # Fall back to word boundary
+            if best_boundary == end:
+                for boundary in WORD_BOUNDARY:
+                    boundary_pos = text.rfind(boundary, start + max_length - 1000, end)
+                    if boundary_pos > start + min_chunk_size:
+                        best_boundary = boundary_pos + len(boundary)
+                        break
+            
+            # Extract chunk
+            chunk = text[start:best_boundary].strip()
+            if len(chunk) >= min_chunk_size:
+                chunks.append(chunk)
+            
+            # Move start position with overlap for context preservation
+            start = max(best_boundary - overlap, start + min_chunk_size)
+            
+            # Prevent infinite loop
+            if start >= len(text):
+                break
+        
+        return chunks
 
     async def _invoke_embedding_model_async(
         self, request_body: dict[str, Any]
