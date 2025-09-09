@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""
+GraphRAG with Neo4j Backend - CLI Wrapper
+==========================================
+
+This script provides an enhanced GraphRAG CLI that automatically uses Neo4j
+when the environment variable GRAPHRAG_GRAPH_DB=neo4j is set or when Neo4j
+is enabled in the settings.yaml configuration.
+
+Usage:
+    export GRAPHRAG_GRAPH_DB=neo4j
+    graphrag_neo4j query --method local --query "Tell me about the deployment process"
+    
+Or:
+    graphrag_neo4j query --method local --query "Tell me about the deployment process" --graphrag-graph-db neo4j
+"""
+
+import os
+import sys
+from pathlib import Path
+
+# Add the current directory to Python path to ensure imports work
+current_dir = Path(__file__).parent
+sys.path.insert(0, str(current_dir))
+
+# Set environment variable for Neo4j backend if not already set
+if not os.getenv('GRAPHRAG_GRAPH_DB'):
+    os.environ['GRAPHRAG_GRAPH_DB'] = 'neo4j'
+
+# Import and run the GraphRAG CLI
+try:
+    from graphrag.cli.main import app
+    
+    if __name__ == "__main__":
+        print("🔗 GraphRAG with Neo4j Backend")
+        print(f"📊 Graph DB: {os.getenv('GRAPHRAG_GRAPH_DB', 'default')}")
+        print("-" * 50)
+        app()
+        
+except ImportError as e:
+    print(f"❌ Error importing GraphRAG: {e}")
+    print("Make sure you have installed the GraphRAG package with Neo4j support.")
+    print("\nTo install:")
+    print("pip install -e .")
+    sys.exit(1)

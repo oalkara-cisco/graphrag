@@ -92,6 +92,40 @@ vector_store:
     container_name: {vector_store_defaults.container_name}
     overwrite: {vector_store_defaults.overwrite}
 
+### Neo4j Graph Database (Optional) ###
+## To use Neo4j as your graph backend instead of parquet files, enable this section
+## and set GRAPHRAG_GRAPH_DB=neo4j environment variable or use --graphrag-graph-db=neo4j CLI flag
+
+# neo4j:
+#   enabled: false  # Set to true to use Neo4j instead of parquet files
+#   uri: "neo4j://localhost:7687"  # Replace with your Neo4j server URI
+#   username: "neo4j"              # Replace with your Neo4j username  
+#   password: "password"           # Replace with your Neo4j password (or use environment variable)
+#   database: "neo4j"              # Replace with your database name if different
+#   
+#   # Optional: Customize search parameters for better performance
+#   global_search:
+#     community_level: 2
+#     max_data_tokens: 8000
+#   local_search:
+#     top_k_entities: 10
+#     top_k_text_units: 3
+#     top_k_relationships: 10
+#     top_k_communities: 3
+#     max_context_tokens: 8000
+#   basic_search:
+#     top_k_text_units: 20
+#     max_context_tokens: 8000
+#   drift_search:
+#     n_depth: 3
+#     drift_k_followups: 5
+#     local_search_max_data_tokens: 8000
+#     local_search_top_k_mapped_entities: 10
+#     local_search_top_k_relationships: 10
+#     local_search_temperature: 0.1
+#     local_search_text_unit_prop: 0.5
+#     local_search_community_prop: 0.1
+
 ### Workflow settings ###
 
 embed_text:

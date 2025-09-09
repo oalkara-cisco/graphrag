@@ -33,6 +33,7 @@ def run_global_search(
     streaming: bool,
     query: str,
     verbose: bool,
+    graph_db: str | None = None,
 ):
     """Perform a global search with a given query.
 
@@ -43,6 +44,33 @@ def run_global_search(
     if data_dir:
         cli_overrides["output.base_dir"] = str(data_dir)
     config = load_config(root, config_filepath, cli_overrides)
+
+    # Check if Neo4j backend is requested
+    if graph_db == "neo4j" or (config.neo4j and config.neo4j.enabled):
+        try:
+            from graphrag.neo4j_integration.neo4j_query_api import neo4j_global_search
+            if streaming:
+                logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+            
+            logger.info("🔗 Using Neo4j backend for global search")
+            response, context_data = asyncio.run(neo4j_global_search(
+                config=config,
+                query=query,
+                community_level=community_level,
+                response_type=response_type,
+                verbose=verbose
+            ))
+            logger.info("Global Search Response:\n%s", response)
+            return response, context_data
+            
+        except ImportError:
+            logger.debug("Neo4j integration not available, falling back to parquet")
+        except Exception as e:
+            logger.error(f"Neo4j global search failed: {e}")
+            logger.info("Falling back to parquet backend")
+    
+    # Fall back to original parquet-based implementation
+    logger.info("📄 Using parquet backend for global search")
 
     dataframe_dict = _resolve_output_files(
         config=config,
@@ -155,6 +183,7 @@ def run_local_search(
     streaming: bool,
     query: str,
     verbose: bool,
+    graph_db: str | None = None,
 ):
     """Perform a local search with a given query.
 
@@ -165,6 +194,33 @@ def run_local_search(
     if data_dir:
         cli_overrides["output.base_dir"] = str(data_dir)
     config = load_config(root, config_filepath, cli_overrides)
+
+    # Check if Neo4j backend is requested
+    if graph_db == "neo4j" or (config.neo4j and config.neo4j.enabled):
+        try:
+            from graphrag.neo4j_integration.neo4j_query_api import neo4j_local_search
+            if streaming:
+                logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+            
+            logger.info("🔗 Using Neo4j backend for local search")
+            response, context_data = asyncio.run(neo4j_local_search(
+                config=config,
+                query=query,
+                community_level=community_level,
+                response_type=response_type,
+                verbose=verbose
+            ))
+            logger.info("Local Search Response:\n%s", response)
+            return response, context_data
+            
+        except ImportError:
+            logger.debug("Neo4j integration not available, falling back to parquet")
+        except Exception as e:
+            logger.error(f"Neo4j local search failed: {e}")
+            logger.info("Falling back to parquet backend")
+
+    # Fall back to original parquet-based implementation
+    logger.info("📄 Using parquet backend for local search")
 
     dataframe_dict = _resolve_output_files(
         config=config,
@@ -298,16 +354,44 @@ def run_drift_search(
     streaming: bool,
     query: str,
     verbose: bool,
+    graph_db: str | None = None,
 ):
-    """Perform a local search with a given query.
+    """Perform a DRIFT search with a given query.
 
-    Loads index files required for local search and calls the Query API.
+    Loads index files required for DRIFT search and calls the Query API.
     """
     root = root_dir.resolve()
     cli_overrides = {}
     if data_dir:
         cli_overrides["output.base_dir"] = str(data_dir)
     config = load_config(root, config_filepath, cli_overrides)
+
+    # Check if Neo4j backend is requested
+    if graph_db == "neo4j" or (config.neo4j and config.neo4j.enabled):
+        try:
+            from graphrag.neo4j_integration.neo4j_query_api import neo4j_drift_search
+            if streaming:
+                logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+            
+            logger.info("🔗 Using Neo4j backend for DRIFT search")
+            response, context_data = asyncio.run(neo4j_drift_search(
+                config=config,
+                query=query,
+                community_level=community_level,
+                response_type=response_type,
+                verbose=verbose
+            ))
+            logger.info("DRIFT Search Response:\n%s", response)
+            return response, context_data
+            
+        except ImportError:
+            logger.debug("Neo4j integration not available, falling back to parquet")
+        except Exception as e:
+            logger.error(f"Neo4j DRIFT search failed: {e}")
+            logger.info("Falling back to parquet backend")
+
+    # Fall back to original parquet-based implementation
+    logger.info("📄 Using parquet backend for DRIFT search")
 
     dataframe_dict = _resolve_output_files(
         config=config,
@@ -428,6 +512,7 @@ def run_basic_search(
     streaming: bool,
     query: str,
     verbose: bool,
+    graph_db: str | None = None,
 ):
     """Perform a basics search with a given query.
 
@@ -438,6 +523,31 @@ def run_basic_search(
     if data_dir:
         cli_overrides["output.base_dir"] = str(data_dir)
     config = load_config(root, config_filepath, cli_overrides)
+
+    # Check if Neo4j backend is requested
+    if graph_db == "neo4j" or (config.neo4j and config.neo4j.enabled):
+        try:
+            from graphrag.neo4j_integration.neo4j_query_api import neo4j_basic_search
+            if streaming:
+                logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+            
+            logger.info("🔗 Using Neo4j backend for basic search")
+            response, context_data = asyncio.run(neo4j_basic_search(
+                config=config,
+                query=query,
+                verbose=verbose
+            ))
+            logger.info("Basic Search Response:\n%s", response)
+            return response, context_data
+            
+        except ImportError:
+            logger.debug("Neo4j integration not available, falling back to parquet")
+        except Exception as e:
+            logger.error(f"Neo4j basic search failed: {e}")
+            logger.info("Falling back to parquet backend")
+
+    # Fall back to original parquet-based implementation
+    logger.info("📄 Using parquet backend for basic search")
 
     dataframe_dict = _resolve_output_files(
         config=config,

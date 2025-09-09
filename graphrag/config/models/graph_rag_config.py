@@ -36,6 +36,7 @@ from graphrag.config.models.summarize_descriptions_config import (
 from graphrag.config.models.text_embedding_config import TextEmbeddingConfig
 from graphrag.config.models.umap_config import UmapConfig
 from graphrag.config.models.vector_store_config import VectorStoreConfig
+from graphrag.config.models.neo4j_config import Neo4jConfig
 from graphrag.vector_stores.factory import VectorStoreType
 
 
@@ -290,6 +291,11 @@ class GraphRagConfig(BaseModel):
         description="The basic search configuration.", default=BasicSearchConfig()
     )
     """The basic search configuration."""
+
+    neo4j: Neo4jConfig | None = Field(
+        description="The Neo4j database configuration.", default=None
+    )
+    """The Neo4j database configuration."""
 
     def _validate_vector_store_db_uri(self) -> None:
         """Validate the vector store configuration."""

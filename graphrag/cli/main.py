@@ -488,6 +488,15 @@ def _query_cli(
         "--streaming/--no-streaming",
         help="Print the response in a streaming manner.",
     ),
+    graphrag_graph_db: str | None = typer.Option(
+        None,
+        "--graphrag-graph-db",
+        help=(
+            "Graph database backend to use (e.g., 'neo4j'). "
+            "Overrides GRAPHRAG_GRAPH_DB environment variable. "
+            "When set to 'neo4j', queries will use Neo4j instead of parquet files."
+        ),
+    ),
 ) -> None:
     """Query a knowledge graph index."""
     from graphrag.cli.query import (
@@ -496,6 +505,9 @@ def _query_cli(
         run_global_search,
         run_local_search,
     )
+    
+    # Determine graph database backend from CLI option or environment variable
+    graph_db = graphrag_graph_db or os.getenv("GRAPHRAG_GRAPH_DB", "").lower()
 
     match method:
         case SearchMethod.LOCAL:
@@ -508,6 +520,7 @@ def _query_cli(
                 streaming=streaming,
                 query=query,
                 verbose=verbose,
+                graph_db=graph_db,
             )
         case SearchMethod.GLOBAL:
             run_global_search(
@@ -520,6 +533,7 @@ def _query_cli(
                 streaming=streaming,
                 query=query,
                 verbose=verbose,
+                graph_db=graph_db,
             )
         case SearchMethod.DRIFT:
             run_drift_search(
@@ -531,6 +545,7 @@ def _query_cli(
                 response_type=response_type,
                 query=query,
                 verbose=verbose,
+                graph_db=graph_db,
             )
         case SearchMethod.BASIC:
             run_basic_search(
@@ -540,6 +555,7 @@ def _query_cli(
                 streaming=streaming,
                 query=query,
                 verbose=verbose,
+                graph_db=graph_db,
             )
         case _:
             raise ValueError(INVALID_METHOD_ERROR)
