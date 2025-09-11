@@ -50,9 +50,9 @@ def run_global_search(
         try:
             from graphrag.neo4j_integration.neo4j_query_api import neo4j_global_search
             if streaming:
-                logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+                logger.warning("Streaming not yet supported with Neo4j backend")
             
-            logger.info("🔗 Using Neo4j backend for global search")
+            logger.info("Using Neo4j backend for global search")
             response, context_data = asyncio.run(neo4j_global_search(
                 config=config,
                 query=query,
@@ -200,9 +200,9 @@ def run_local_search(
         try:
             from graphrag.neo4j_integration.neo4j_query_api import neo4j_local_search
             if streaming:
-                logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+                logger.warning("Streaming not yet supported with Neo4j backend")
             
-            logger.info("🔗 Using Neo4j backend for local search")
+            logger.info("Using Neo4j backend for local search")
             response, context_data = asyncio.run(neo4j_local_search(
                 config=config,
                 query=query,
@@ -371,9 +371,9 @@ def run_drift_search(
         try:
             from graphrag.neo4j_integration.neo4j_query_api import neo4j_drift_search
             if streaming:
-                logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+                logger.warning("Streaming not yet supported with Neo4j backend")
             
-            logger.info("🔗 Using Neo4j backend for DRIFT search")
+            logger.info("Using Neo4j backend for DRIFT search")
             response, context_data = asyncio.run(neo4j_drift_search(
                 config=config,
                 query=query,
@@ -529,9 +529,9 @@ def run_basic_search(
         try:
             from graphrag.neo4j_integration.neo4j_query_api import neo4j_basic_search
             if streaming:
-                logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+                logger.warning("Streaming not yet supported with Neo4j backend")
             
-            logger.info("🔗 Using Neo4j backend for basic search")
+            logger.info("Using Neo4j backend for basic search")
             response, context_data = asyncio.run(neo4j_basic_search(
                 config=config,
                 query=query,

@@ -84,20 +84,49 @@ class LocalSearch(BaseSearch[LocalContextBuilder]):
                     context_data=context_result.context_chunks,
                     response_type=self.response_type,
                 )
+            
             history_messages = [
                 {"role": "system", "content": search_prompt},
             ]
 
             full_response = ""
 
-            async for response in self.model.achat_stream(
-                prompt=query,
-                history=history_messages,
-                model_parameters=self.model_params,
-            ):
-                full_response += response
-                for callback in self.callbacks:
-                    callback.on_llm_new_token(response)
+            # Check if JSON format is requested (for DRIFT compatibility)
+            json_requested = (
+                self.model_params and 
+                self.model_params.get("response_format", {}).get("type") == "json_object"
+            )
+            
+            if json_requested:
+                # For Bedrock compatibility with JSON requests (DRIFT actions)
+                full_prompt = f"""{search_prompt}
+
+Provide your response in JSON format with the following structure:
+{{
+    "response": "Your detailed answer here",
+    "score": 85,
+    "follow_up_queries": ["Question 1", "Question 2", "Question 3"]
+}}
+
+Query: {query}"""
+                
+                # Use single call for JSON response
+                json_response = await self.model.achat(
+                    prompt=full_prompt,
+                    history=None,
+                    model_parameters=self.model_params,
+                )
+                full_response = json_response.output.content
+            else:
+                # Standard streaming for regular searches
+                async for response in self.model.achat_stream(
+                    prompt=query,
+                    history=history_messages,
+                    model_parameters=self.model_params,
+                ):
+                    full_response += response
+                    for callback in self.callbacks:
+                        callback.on_llm_new_token(response)
 
             llm_calls["response"] = 1
             prompt_tokens["response"] = num_tokens(search_prompt, self.token_encoder)

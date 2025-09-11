@@ -375,17 +375,19 @@ class DRIFTSearch(BaseSearch[DRIFTSearchContextBuilder]):
                 if response.get("answer")
             ]
 
-        search_prompt = self.context_builder.reduce_system_prompt.format(
+        # Use elegant Bedrock-compatible prompt formatter
+        from .bedrock_formatter import BedrockPromptFormatter
+        
+        formatted_prompt = BedrockPromptFormatter.format_reduce_prompt(
+            system_prompt_template=self.context_builder.reduce_system_prompt,
             context_data=reduce_responses,
             response_type=self.context_builder.response_type,
+            query=query
         )
-        search_messages = [
-            {"role": "system", "content": search_prompt},
-        ]
 
         model_response = await self.model.achat(
-            prompt=query,
-            history=search_messages,
+            prompt=formatted_prompt,
+            history=None,  # Bedrock compatibility
             model_parameters=llm_kwargs.get("model_params", {}),
         )
 
@@ -393,8 +395,8 @@ class DRIFTSearch(BaseSearch[DRIFTSearchContextBuilder]):
 
         llm_calls["reduce"] = 1
         prompt_tokens["reduce"] = num_tokens(
-            search_prompt, self.token_encoder
-        ) + num_tokens(query, self.token_encoder)
+            formatted_prompt, self.token_encoder
+        )
         output_tokens["reduce"] = num_tokens(reduced_response, self.token_encoder)
 
         return reduced_response
@@ -430,17 +432,19 @@ class DRIFTSearch(BaseSearch[DRIFTSearchContextBuilder]):
                 if response.get("answer")
             ]
 
-        search_prompt = self.context_builder.reduce_system_prompt.format(
+        # Use elegant Bedrock-compatible prompt formatter
+        from .bedrock_formatter import BedrockPromptFormatter
+        
+        formatted_prompt = BedrockPromptFormatter.format_reduce_prompt(
+            system_prompt_template=self.context_builder.reduce_system_prompt,
             context_data=reduce_responses,
             response_type=self.context_builder.response_type,
+            query=query
         )
-        search_messages = [
-            {"role": "system", "content": search_prompt},
-        ]
 
         async for response in self.model.achat_stream(
-            prompt=query,
-            history=search_messages,
+            prompt=formatted_prompt,
+            history=None,  # Bedrock compatibility
             model_parameters=model_params,
         ):
             for callback in self.callbacks:

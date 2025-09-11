@@ -71,7 +71,9 @@ class Neo4jGlobalContextBuilder(GlobalContextBuilder):
             level = kwargs.get("community_level", self.community_level)
             
             # Get community reports from Neo4j
+            logger.info(f"Retrieving community reports from Neo4j (level: {level})...")
             community_reports_df = self.neo4j.get_communities_by_level(level)
+            logger.info(f"Retrieved {len(community_reports_df)} community reports from Neo4j graph")
             
             if community_reports_df.empty:
                 logger.warning(f"No community reports found for level {level}")
@@ -205,10 +207,16 @@ class Neo4jLocalContextBuilder(LocalContextBuilder):
             top_k_relationships = kwargs.get("top_k_relationships", self.top_k_relationships)
             top_k_communities = kwargs.get("top_k_communities", self.top_k_communities)
             
+            logger.info(f"Building Neo4j Local Search context (k_entities: {top_k_entities}, "
+                       f"k_text_units: {top_k_text_units}, k_relationships: {top_k_relationships})")
+            
             # 1. Generate query embedding
+            logger.info("Generating query embedding...")
             query_embedding = self.embeddings_model.embed_query(query)
+            logger.info(f"Query embedding generated (dimensions: {len(query_embedding)})")
             
             # 2. Get comprehensive context using hybrid approach
+            logger.info("Retrieving hybrid vector-graph context from Neo4j...")
             context_data = self.vector_graph_store.get_local_search_context(
                 query_embedding=query_embedding,
                 top_k_entities=top_k_entities,
@@ -216,6 +224,16 @@ class Neo4jLocalContextBuilder(LocalContextBuilder):
                 top_k_relationships=top_k_relationships,
                 top_k_communities=top_k_communities
             )
+            
+            # Log the retrieved data counts
+            entities_count = len(context_data.get('entities', []))
+            text_units_count = len(context_data.get('text_units', []))
+            relationships_count = len(context_data.get('relationships', []))
+            communities_count = len(context_data.get('communities', []))
+            
+            logger.info(f"Retrieved from Neo4j graph: {entities_count} entities, "
+                       f"{text_units_count} text units, {relationships_count} relationships, "
+                       f"{communities_count} communities")
             
             # 3. Format context for LLM
             context_chunks = self._format_local_context(context_data)
@@ -391,8 +409,25 @@ class Neo4jDRIFTContextBuilder(DRIFTContextBuilder):
         )
         
         # Add required attributes for DRIFT search compatibility
-        self.local_system_prompt = config.get("local_system_prompt", "You are a helpful assistant.")
-        self.reduce_system_prompt = config.get("reduce_system_prompt", "You are a helpful assistant that reduces and summarizes information.")
+        self.local_system_prompt = config.get("local_system_prompt", 
+            "You are a helpful assistant responding to questions about data in the tables provided. "
+            "Generate a response of the target length and format that responds to the user's question, "
+            "summarizing ONLY information from the input data tables. "
+            "Do NOT use external knowledge or general knowledge. "
+            "If you don't know the answer based on the provided data, just say so. Do not make anything up. "
+            "Points supported by data should list their data references as follows: "
+            "[Data: <dataset name> (record ids)]. "
+            "\n\n---Data tables---\n\n{context_data}\n\n"
+            "---Target response length and format---\n\n{response_type}\n\n"
+            "Generate your response based ONLY on the data tables above.")
+        self.reduce_system_prompt = config.get("reduce_system_prompt", 
+            "You are a helpful assistant that reduces and summarizes information ONLY from the provided data reports. "
+            "Do NOT use external knowledge or general knowledge. "
+            "Generate a comprehensive response based on the following data reports: "
+            "\n\n---Data Reports---\n\n{context_data}\n\n"
+            "---Target response length and format---\n\n{response_type}\n\n"
+            "If no relevant information is found in the provided data, state clearly 'No relevant information found in the available data about this topic.' "
+            "Generate your response based ONLY on the data reports above.")
         self.response_type = config.get("response_type", "multiple paragraphs")
         
         # Initialize local context builder for DRIFT internal use

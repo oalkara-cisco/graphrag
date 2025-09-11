@@ -73,25 +73,34 @@ class DriftAction:
         search_result = await search_engine.search(
             drift_query=global_query, query=self.query
         )
-
-        # Do not launch exception as it will roll up with other steps
-        # Instead return an empty response and let score -inf handle it
-        _, response = try_parse_json_object(search_result.response, verbose=False)
-
-        self.answer = response.pop("response", None)
-        self.score = float(response.pop("score", "-inf"))
+        
+        # Use elegant response adapter for unified response handling
+        from .response_adapter import DriftResponseAdapter
+        
+        normalized_response = DriftResponseAdapter.adapt_search_response(
+            raw_response=search_result.response,
+            component_name="LocalSearch",
+            default_score=80
+        )
+        
+        self.answer = normalized_response["response"]
+        self.score = normalized_response["score"] 
         self.metadata.update({"context_data": search_result.context_data})
-
-        if self.answer is None:
+        
+        # Store follow-ups for later extraction
+        self._normalized_followups = normalized_response["follow_up_queries"]
+        
+        if not self.answer or self.answer.strip() == "":
             logger.warning("No answer found for query: %s", self.query)
 
         self.metadata["llm_calls"] += 1
         self.metadata["prompt_tokens"] += search_result.prompt_tokens
         self.metadata["output_tokens"] += search_result.output_tokens
 
-        self.follow_ups = response.pop("follow_up_queries", [])
+        # Use normalized follow-ups from response adapter
+        self.follow_ups = getattr(self, "_normalized_followups", [])
         if not self.follow_ups:
-            logger.warning("No follow-up actions found for response: %s", response)
+            logger.warning("No follow-up actions found for response: %s", normalized_response)
 
         if scorer:
             self.compute_score(scorer)
@@ -194,15 +203,15 @@ class DriftAction:
 
         # If response is a string, attempt to parse as JSON
         if isinstance(response, str):
-            try:
-                parsed_response = json.loads(response)
-                if isinstance(parsed_response, dict):
-                    return cls.from_primer_response(query, parsed_response)
-                error_message = "Parsed response must be a dictionary."
+            # Use robust JSON parsing for DRIFT compatibility
+            from ...llm.text_utils import try_parse_json_object
+            
+            success, parsed_response = try_parse_json_object(response)
+            if success and isinstance(parsed_response, dict):
+                return cls.from_primer_response(query, parsed_response)
+            else:
+                error_message = f"Failed to parse response string as valid JSON dictionary."
                 raise ValueError(error_message)
-            except json.JSONDecodeError as e:
-                error_message = f"Failed to parse response string: {e}. Parsed response must be a dictionary."
-                raise ValueError(error_message) from e
 
         error_message = f"Unsupported response type: {type(response).__name__}. Expected a dictionary or JSON string."
         raise ValueError(error_message)

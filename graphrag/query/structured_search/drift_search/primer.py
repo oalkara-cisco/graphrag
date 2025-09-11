@@ -140,7 +140,17 @@ class DRIFTPrimer:
         model_response = await self.chat_model.achat(prompt, json=True)
         response = model_response.output.content
 
-        parsed_response = json.loads(response)
+        # Use robust JSON parsing for DRIFT compatibility  
+        from ...llm.text_utils import try_parse_json_object
+        
+        success, parsed_response = try_parse_json_object(response)
+        if not success or parsed_response is None:
+            # Fallback if JSON parsing fails
+            parsed_response = {
+                "intermediate_answer": "Unable to parse response from this query.",
+                "score": 0,
+                "follow_up_queries": ["Could you provide more information?"]
+            }
 
         token_ct = {
             "llm_calls": 1,

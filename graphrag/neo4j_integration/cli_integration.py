@@ -74,6 +74,10 @@ def create_neo4j_components(config: GraphRagConfig) -> Tuple[Neo4jGraphBackend, 
     """Create and initialize Neo4j components from GraphRAG configuration."""
     
     # Initialize Neo4j backend using config from settings.yaml
+    logger.info("Creating Neo4j backend connection...")
+    logger.info(f"Neo4j URI: {config.neo4j.uri}")
+    logger.info(f"Neo4j Database: {config.neo4j.database}")
+    
     neo4j_backend_config = Neo4jConfig(
         uri=config.neo4j.uri,
         username=config.neo4j.username,
@@ -81,23 +85,27 @@ def create_neo4j_components(config: GraphRagConfig) -> Tuple[Neo4jGraphBackend, 
         database=config.neo4j.database
     )
     neo4j_backend = Neo4jGraphBackend(neo4j_backend_config)
+    logger.info("Neo4j backend connection established successfully")
     
     # Get LanceDB path from vector store configuration
     vector_store_config = config.get_vector_store_config("default_vector_store")
     lancedb_path = vector_store_config.db_uri
+    logger.info(f"LanceDB path: {lancedb_path}")
     
     # Create vector-graph store  
+    logger.info("Creating Neo4j vector-graph store...")
     vector_graph_store = Neo4jVectorGraphStore(neo4j_backend, lancedb_path)
+    logger.info("Neo4j vector-graph store created successfully")
     
     # Initialize AI models from GraphRAG config
-    llm_config = config.models.get("chat", getattr(config, 'llm', None))
+    llm_config = config.models.get("default_chat_model", None)
     if not llm_config:
         raise ValueError("Chat model configuration not found. Please check your settings.yaml.")
     
     chat_model = BedrockChatModel(name="bedrock_chat", config=llm_config)
     
     # Initialize embedding model
-    embeddings_config = config.models.get("embedding", getattr(config.embeddings, 'llm', None))
+    embeddings_config = config.models.get("default_embedding_model", None)
     if not embeddings_config:
         raise ValueError("Embedding model configuration not found. Please check your settings.yaml.")
         
@@ -118,7 +126,7 @@ async def run_neo4j_global_search(
     """Run global search using Neo4j backend."""
     
     if streaming:
-        logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+        logger.warning("Streaming not yet supported with Neo4j backend")
     
     neo4j_backend = None
     try:
@@ -178,7 +186,7 @@ async def run_neo4j_local_search(
     """Run local search using Neo4j backend."""
     
     if streaming:
-        logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+        logger.warning("Streaming not yet supported with Neo4j backend")
     
     vector_graph_store = None
     try:
@@ -241,7 +249,7 @@ async def run_neo4j_basic_search(
     """Run basic search using Neo4j backend."""
     
     if streaming:
-        logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+        logger.warning("Streaming not yet supported with Neo4j backend")
     
     vector_graph_store = None
     try:
@@ -303,7 +311,7 @@ async def run_neo4j_drift_search(
     """Run DRIFT search using Neo4j backend."""
     
     if streaming:
-        logger.warning("⚠️ Streaming not yet supported with Neo4j backend")
+        logger.warning("Streaming not yet supported with Neo4j backend")
     
     vector_graph_store = None
     try:
@@ -367,7 +375,7 @@ def handle_global_search_with_neo4j(
     """Handle global search with Neo4j backend if enabled."""
     
     if should_use_neo4j(graph_db, config):
-        logger.info("🔗 Using Neo4j backend for global search")
+        logger.info("Using Neo4j backend for global search")
         return asyncio.run(run_neo4j_global_search(
             config, query, community_level, response_type, streaming, verbose
         ))
@@ -386,7 +394,7 @@ def handle_local_search_with_neo4j(
     """Handle local search with Neo4j backend if enabled."""
     
     if should_use_neo4j(graph_db, config):
-        logger.info("🔗 Using Neo4j backend for local search")
+        logger.info("Using Neo4j backend for local search")
         return asyncio.run(run_neo4j_local_search(
             config, query, community_level, response_type, streaming, verbose
         ))
@@ -403,7 +411,7 @@ def handle_basic_search_with_neo4j(
     """Handle basic search with Neo4j backend if enabled."""
     
     if should_use_neo4j(graph_db, config):
-        logger.info("🔗 Using Neo4j backend for basic search")
+        logger.info("Using Neo4j backend for basic search")
         return asyncio.run(run_neo4j_basic_search(
             config, query, streaming, verbose
         ))
@@ -422,7 +430,7 @@ def handle_drift_search_with_neo4j(
     """Handle DRIFT search with Neo4j backend if enabled."""
     
     if should_use_neo4j(graph_db, config):
-        logger.info("🔗 Using Neo4j backend for DRIFT search")
+        logger.info("Using Neo4j backend for DRIFT search")
         return asyncio.run(run_neo4j_drift_search(
             config, query, community_level, response_type, streaming, verbose
         ))

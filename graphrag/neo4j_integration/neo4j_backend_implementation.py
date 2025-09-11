@@ -453,7 +453,7 @@ if __name__ == "__main__":
     )
     
     if not config.password:
-        print("❌ Error: NEO4J_PASSWORD environment variable must be set")
+        print("Error: NEO4J_PASSWORD environment variable must be set")
         print("Usage: NEO4J_PASSWORD=your_password python neo4j_backend_implementation.py")
         exit(1)
     
@@ -463,8 +463,8 @@ if __name__ == "__main__":
     # Get LanceDB path from environment variable (for demo purposes)
     # In production, this should come from GraphRAG config: config.get_vector_store_config("default_vector_store").db_uri
     lancedb_path = os.getenv("LANCEDB_PATH", "./output/lancedb")
-    print(f"💡 Using LanceDB path: {lancedb_path}")
-    print("💡 In production, configure this via vector_store.default_vector_store.db_uri in settings.yaml")
+    print(f"Using LanceDB path: {lancedb_path}")
+    print("In production, configure this via vector_store.default_vector_store.db_uri in settings.yaml")
     
     vector_store = Neo4jVectorGraphStore(backend, lancedb_path)
     
@@ -477,11 +477,11 @@ if __name__ == "__main__":
         communities = backend.get_communities_by_level(level=2)
         print(f"Level 2 communities: {len(communities)}")
         
-        print("✅ Neo4j backend connection successful!")
-        print("💡 Tip: Use this backend in your GraphRAG application by configuring settings.yaml")
+        print("Neo4j backend connection successful!")
+        print("Tip: Use this backend in your GraphRAG application by configuring settings.yaml")
         
     except Exception as e:
-        print(f"❌ Error connecting to Neo4j: {e}")
+        print(f"Error connecting to Neo4j: {e}")
         print("Please check your connection details and ensure Neo4j is running.")
         
     finally:
