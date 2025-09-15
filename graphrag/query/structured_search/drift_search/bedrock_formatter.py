@@ -1,4 +1,4 @@
-compl"""
+"""
 Bedrock-Compatible Prompt Formatter for DRIFT Search
 ====================================================
 

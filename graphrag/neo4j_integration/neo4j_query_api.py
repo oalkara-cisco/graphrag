@@ -73,16 +73,35 @@ async def neo4j_global_search(
         logger.info(f"Global search parameters: community_level={final_community_level}, "
                    f"max_data_tokens={max_data_tokens}")
         
+        # Get token encoder for accurate token counting
+        token_encoder = get_token_encoder_from_config(config)
+        
+        # Get all Microsoft GraphRAG compatible parameters from config
+        global_search_config = config.neo4j.global_search
+        
         context_builder = Neo4jGlobalContextBuilder(
             neo4j_backend=neo4j_backend,
+            token_encoder=token_encoder,
             max_data_tokens=max_data_tokens,
-            community_level=final_community_level
+            community_level=final_community_level,
+            # Microsoft GraphRAG Enhanced Parameters (configurable)
+            use_community_summary=global_search_config.get("use_community_summary", True),
+            column_delimiter=global_search_config.get("column_delimiter", "|"),
+            shuffle_data=global_search_config.get("shuffle_data", True),
+            include_community_rank=global_search_config.get("include_community_rank", True),
+            min_community_rank=global_search_config.get("min_community_rank", 0),
+            community_rank_name=global_search_config.get("community_rank_name", "rank"),
+            include_community_weight=global_search_config.get("include_community_weight", True),
+            community_weight_name=global_search_config.get("community_weight_name", "occurrence weight"),
+            normalize_community_weight=global_search_config.get("normalize_community_weight", True),
+            single_batch=global_search_config.get("single_batch", False),
+            context_name=global_search_config.get("context_name", "Reports"),
+            random_state=global_search_config.get("random_state", 86)
         )
-        logger.info("Neo4j Global Context Builder created successfully")
+        logger.info("Neo4j Global Context Builder created with Microsoft GraphRAG compatibility")
         
         # Create search engine
         logger.info("Initializing Neo4j Global Search Engine...")
-        token_encoder = get_token_encoder_from_config(config)
         search_engine = GlobalSearch(
             model=chat_model,
             context_builder=context_builder,
@@ -163,14 +182,32 @@ async def neo4j_local_search(
                    f"top_k_text_units={local_config.get('top_k_text_units', 3)}, "
                    f"max_context_tokens={local_config.get('max_context_tokens', 8000)}")
         
+        # Get token encoder for accurate token counting
+        token_encoder = get_token_encoder_from_config(config)
+        
         context_builder = Neo4jLocalContextBuilder(
             vector_graph_store=vector_graph_store,
             embeddings_model=embeddings_model,
+            token_encoder=token_encoder,
             max_context_tokens=local_config.get("max_context_tokens", 8000),
-            top_k_entities=local_config.get("top_k_entities", 10),
+            # Microsoft GraphRAG Enhanced Parameters (configurable)
+            top_k_mapped_entities=local_config.get("top_k_mapped_entities", local_config.get("top_k_entities", 10)),
             top_k_text_units=local_config.get("top_k_text_units", 3),
             top_k_relationships=local_config.get("top_k_relationships", 10),
-            top_k_communities=local_config.get("top_k_communities", 3)
+            top_k_communities=local_config.get("top_k_communities", 3),
+            text_unit_prop=local_config.get("text_unit_prop", 0.5),
+            community_prop=local_config.get("community_prop", 0.25),
+            include_community_rank=local_config.get("include_community_rank", True),
+            include_entity_rank=local_config.get("include_entity_rank", True),
+            rank_description=local_config.get("rank_description", "number of relationships"),
+            include_relationship_weight=local_config.get("include_relationship_weight", True),
+            relationship_ranking_attribute=local_config.get("relationship_ranking_attribute", "rank"),
+            return_candidate_context=local_config.get("return_candidate_context", False),
+            use_community_summary=local_config.get("use_community_summary", False),
+            min_community_rank=local_config.get("min_community_rank", 0),
+            community_context_name=local_config.get("community_context_name", "Reports"),
+            column_delimiter=local_config.get("column_delimiter", "|"),
+            embedding_vectorstore_key=local_config.get("embedding_vectorstore_key", "id")
         )
         logger.info("Neo4j Local Context Builder created successfully")
         
@@ -266,17 +303,27 @@ async def neo4j_basic_search(
         basic_config = config.neo4j.basic_search
         logger.info(f"Basic search parameters: top_k_text_units={basic_config.get('top_k_text_units', 20)}, "
                    f"max_context_tokens={basic_config.get('max_context_tokens', 8000)}")
+        
+        # Get token encoder for accurate token counting
+        token_encoder = get_token_encoder_from_config(config)
+        
         context_builder = Neo4jBasicContextBuilder(
             vector_graph_store=vector_graph_store,
             embeddings_model=embeddings_model,
-            max_context_tokens=basic_config.get("max_context_tokens", 8000),
-            top_k_text_units=basic_config.get("top_k_text_units", 20)
+            token_encoder=token_encoder,
+            max_context_tokens=basic_config.get("max_context_tokens", 12000),
+            top_k_text_units=basic_config.get("top_k_text_units", 20),
+            # Microsoft GraphRAG Enhanced Parameters (configurable)
+            context_name=basic_config.get("context_name", "Sources"),
+            column_delimiter=basic_config.get("column_delimiter", "|"),
+            text_id_col=basic_config.get("text_id_col", "source_id"),
+            text_col=basic_config.get("text_col", "text"),
+            embedding_vectorstore_key=basic_config.get("embedding_vectorstore_key", "id")
         )
         logger.info("Neo4j Basic Context Builder created successfully")
         
         # Create search engine
         logger.info("Initializing Neo4j Basic Search Engine...")
-        token_encoder = get_token_encoder_from_config(config)
         search_engine = BasicSearch(
             model=chat_model,
             context_builder=context_builder,
@@ -363,18 +410,26 @@ async def neo4j_drift_search(
         logger.info(f"DRIFT search parameters: n_depth={drift_config.get('n_depth', 3)}, "
                    f"drift_k_followups={drift_config.get('drift_k_followups', 5)}")
         
+        # Get token encoder for accurate token counting
+        token_encoder = get_token_encoder_from_config(config)
+        
         context_builder = Neo4jDRIFTContextBuilder(
             neo4j_backend=neo4j_backend,
             vector_graph_store=vector_graph_store,
             embeddings_model=embeddings_model,
             chat_model=chat_model,
-            config=drift_config
+            token_encoder=token_encoder,
+            config=drift_config,
+            # Microsoft GraphRAG Enhanced Parameters (configurable)
+            embedding_vectorstore_key=drift_config.get("embedding_vectorstore_key", "id"),
+            local_system_prompt=drift_config.get("local_system_prompt"),
+            reduce_system_prompt=drift_config.get("reduce_system_prompt"),
+            response_type=drift_config.get("response_type", "multiple paragraphs")
         )
         logger.info("Neo4j DRIFT Context Builder created successfully")
         
         # Create search engine
         logger.info("Initializing Neo4j DRIFT Search Engine...")
-        token_encoder = get_token_encoder_from_config(config)
         search_engine = DRIFTSearch(
             model=chat_model,
             context_builder=context_builder,

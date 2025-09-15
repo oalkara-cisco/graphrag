@@ -140,11 +140,28 @@ async def run_neo4j_global_search(
         # Create token encoder from configuration
         token_encoder = get_token_encoder_from_config(config)
         
-        # Create context builder
+        # Create context builder with full Microsoft GraphRAG compatibility
+        global_search_config = config.neo4j.global_search
+        final_community_level = community_level or global_search_config.get("community_level", 2)
+        
         context_builder = Neo4jGlobalContextBuilder(
             neo4j_backend=neo4j_backend,
-            max_data_tokens=config.neo4j.global_search.get("max_data_tokens", 8000),
-            community_level=community_level or config.neo4j.global_search.get("community_level", 2)
+            token_encoder=token_encoder,
+            max_data_tokens=global_search_config.get("max_data_tokens", 8000),
+            community_level=final_community_level,
+            # Microsoft GraphRAG Enhanced Parameters (configurable)
+            use_community_summary=global_search_config.get("use_community_summary", True),
+            column_delimiter=global_search_config.get("column_delimiter", "|"),
+            shuffle_data=global_search_config.get("shuffle_data", True),
+            include_community_rank=global_search_config.get("include_community_rank", True),
+            min_community_rank=global_search_config.get("min_community_rank", 0),
+            community_rank_name=global_search_config.get("community_rank_name", "rank"),
+            include_community_weight=global_search_config.get("include_community_weight", True),
+            community_weight_name=global_search_config.get("community_weight_name", "occurrence weight"),
+            normalize_community_weight=global_search_config.get("normalize_community_weight", True),
+            single_batch=global_search_config.get("single_batch", False),
+            context_name=global_search_config.get("context_name", "Reports"),
+            random_state=global_search_config.get("random_state", 86)
         )
         
         # Create search engine
